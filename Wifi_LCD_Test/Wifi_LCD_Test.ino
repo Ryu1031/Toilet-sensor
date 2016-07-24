@@ -9,6 +9,7 @@
 #include <I2C_Adafruit_8x8_LED_matrix.h>
 #include <OLED_SSD1306.h>
 
+
 const char* ssid = "";
 const char* password = "";
 
@@ -57,7 +58,7 @@ uint8_t Direction = 0;
 uint8_t brightness = 0;
 int16_t Angle = 0;
 
-boolean sjis_txt_in = false, sjis_txt_in2 = false;
+boolean sjis_txt_in = true, sjis_txt_in2 = false;
 boolean BW_reverse = false, BW_reverse2 = false;
 
 //-------NTPサーバー定義----------------
@@ -92,6 +93,7 @@ struct TimeStrData TSD[7] =
 uint8_t web_get = 0, web_get2 = 0;
 uint32_t Web_time = 0;
 boolean first_get = false;
+String mLocalIP;
 
 //-----OLED-----------------------------------------------
 uint8_t OLED_tmp_buf_cnv2[8] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -102,63 +104,9 @@ uint8_t OLED_Next_buf[8][8] = {{0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0
 uint8_t tmp_OLED_buf_cnv2[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t tmp_OLED_buf_cnv3[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
-//*************************NTP Time**************************************
-void sendNTPpacket(IPAddress &address)
-{ // send an NTP request to the time server at the given address
-  // set all bytes in the buffer to 0
-  memset(packetBuffer, 0, NTP_PACKET_SIZE);
-  // Initialize values needed to form NTP request
-  // (see URL above for details on the packets)
-  packetBuffer[0] = 0b11100011;   // LI, Version, Mode
-  packetBuffer[1] = 0;     // Stratum, or type of clock
-  packetBuffer[2] = 6;     // Polling Interval
-  packetBuffer[3] = 0xEC;  // Peer Clock Precision
-  // 8 bytes of zero for Root Delay & Root Dispersion
-  packetBuffer[12]  = 49;
-  packetBuffer[13]  = 0x4E;
-  packetBuffer[14]  = 49;
-  packetBuffer[15]  = 52;
-  // all NTP fields have been given values, now
-  // you can send a packet requesting a timestamp:
-  Udp.beginPacket(address, 123); //NTP requests are to port 123
-  Udp.write(packetBuffer, NTP_PACKET_SIZE);
-  Udp.endPacket();
-}
-//*************************NTP Time**************************************
-time_t getNtpTime()
-{
-  while (Udp.parsePacket() > 0) ; // discard any previously received packets
-  Serial.println("Transmit NTP Request");
-  sendNTPpacket(timeServer);
-  uint32_t beginWait = millis();
-  while (millis() - beginWait < 1500) {
-    int size = Udp.parsePacket();
-    if (size >= NTP_PACKET_SIZE) {
-      Serial.println("Receive NTP Response");
-      Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
-      unsigned long secsSince1900;
-      // convert four bytes starting at location 40 to a long integer
-      secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
-      secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
-      secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
-      secsSince1900 |= (unsigned long)packetBuffer[43];
-      return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
-    }
-  }
-  Serial.println("No NTP Response :-(");
-  return 0; // return 0 if unable to get the time
-}
 
 
-//***********セットアップ***************************************************
-void setup()
-{
-  Wire.begin(); // I2C initialise the connection
-  Wire.setClock(400000L); //クロックはMax 400kHz
-
-  oled.setup_OLED_SSD1306(OLED_Adress);
-
-  delay(300);
+void initialize() {
   //セットアップで全角を一旦表示させることが重要。半角だとなぜかSPIFFSファイル読み込みエラーになってしまうため。
   u8ts.UTF8_to_SJIS_str_cnv(UTF8SJIS_file, "ＷＡＩＴ・・・・", sj_txt, &sj_length);
   for (uint8_t i = 0; i < 8; i++) MFR.Sjis_To_MisakiFNT_DotRead(Zen_Font_file, Half_Font_file, 0, 0, sj_txt[i * 2], sj_txt[i * 2 + 1], LedDotOut[i]);
@@ -171,9 +119,9 @@ void setup()
   }
 
   html_str1 = "<body style='background:#ddddff; color:#000;'>\r\n";
-  html_str1 += ews.EWS_TextBox_Send("txt1", "", "送信");
+  html_str1 += ews.EWS_TextBox_Send("txt1", "１行目任意テキスト送信、半角ｶﾀｶﾅもOK!", "送信");
   html_str1 += "<br>\r\n";
-  html_str1 += ews.EWS_TextBox_Send("Txt2", "", "送信");
+  html_str1 += ews.EWS_TextBox_Send("Txt2", "２行目任意text送信、半角ｶﾀｶﾅもOK!", "送信");
   html_str1 += "<br><br>\r\n";
   html_str2 = "Scrolle Speed 1\r\n";
   html_str2 += ews.EWS_Canvas_Slider_T("Speed", 200, 40, "#777777", "#77aaff");
@@ -211,6 +159,17 @@ void setup()
   html_str6 += ews.EWS_Window_ReLoad_Button("ReLoad", 150, 40, 17);
   html_str6 += "</body></html>\r\n";
   html_str7 = "";
+}
+
+//***********セットアップ***************************************************
+void setup()
+{
+  Wire.begin(); // I2C initialise the connection
+  Wire.setClock(400000L); //クロックはMax 400kHz
+
+  oled.setup_OLED_SSD1306(OLED_Adress);
+  delay(300);
+  initialize();
 
   ews.AP_Connect(ssid, password);
 
@@ -219,9 +178,76 @@ void setup()
   setSyncProvider(getNtpTime);
   delay(1000);
 
+  mLocalIP = "     [" + WiFi.localIP().toString() + "]     ";
+  u8ts.UTF8_to_SJIS_str_cnv(UTF8SJIS_file, mLocalIP, sj_txt, &sj_length);
   SclTime = millis();
   LastTime = millis();
   prevDisplay = now();
+}
+
+//OLED1行目電光掲示板スクロール
+void LCDDisplayLineOne(uint8_t xsj_txt[])
+{
+  uint8_t i;
+  if (millis() - SclTime > SclSpeed) {
+    if (sj_cnt >= sj_length) {
+      sj_cnt = 0;
+    }
+    if (FntReadOK == true) {
+      uint8_t cp = MFR.Sjis_To_MisakiFNT_DotRead(Zen_Font_file, Half_Font_file, Direction, Angle, xsj_txt[sj_cnt], xsj_txt[sj_cnt + 1], tmp_buf_cnv);
+      FntReadOK = false;
+      sj_cnt = sj_cnt + cp;
+      adaLED.LED_Black_White_Reversal(BW_reverse, tmp_buf_cnv, tmp_buf_cnv);
+      adaLED.LED_Dot_Rotation(Angle, tmp_buf_cnv, tmp_buf_cnv_2);
+    }
+
+    if (Scl_Stop == false) {
+      for (i = 0; i < 8; i++) adaLED.LED_Dot_Rotation(90, LedDotOut[i], OLED_DotOut2[i]);
+      oled.OLED_2X2_Display_Out_16x127(OLED_Adress, 0, 6, OLED_DotOut2[0], OLED_DotOut2[1], OLED_DotOut2[2], OLED_DotOut2[3], OLED_DotOut2[4], OLED_DotOut2[5], OLED_DotOut2[6], OLED_DotOut2[7]);
+      adaLED.Scroller_Dot_Replace( Direction, Next_buf[0], LedDotOut[0], tmp_buf_cnv_2);
+      for (i = 0; i < 7; i++) adaLED.Scroller_Dot_Replace( Direction, Next_buf[i + 1], LedDotOut[i + 1], Next_buf[i]);
+      scl_cnt++;
+    }
+
+    if (scl_cnt == 8) {
+      scl_cnt = 0;
+      FntReadOK = true;
+    }
+    SclTime = millis();
+  }
+
+}
+
+//OLED2行目電光掲示板スクロール
+void LCDDisplayLineTwo(uint8_t xsj_txt2[])
+{
+  uint8_t i;
+  if (millis() - SclTime2 > SclSpeed2) {
+    if (sj_cnt2 >= sj_length2) {
+      sj_cnt2 = 0;
+    }
+    if (FntReadOK2 == true) {
+      uint8_t cp2 = MFR.Sjis_To_MisakiFNT_DotRead(Zen_Font_file, Half_Font_file, Direction, Angle, xsj_txt2[sj_cnt2], xsj_txt2[sj_cnt2 + 1], tmp_buf_cnv2);
+      FntReadOK2 = false;
+      sj_cnt2 = sj_cnt2 + cp2;
+      adaLED.LED_Black_White_Reversal(BW_reverse2, tmp_buf_cnv2, tmp_buf_cnv2);
+    }
+
+    if (Scl_Stop == false) {
+      for (i = 0; i < 8; i++) adaLED.LED_Dot_Rotation(90, LedDotOut2[i], OLED_DotOut3[i]);
+      oled.OLED_2X2_Display_Out_16x127(OLED_Adress, 0, 4, OLED_DotOut3[0], OLED_DotOut3[1], OLED_DotOut3[2], OLED_DotOut3[3], OLED_DotOut3[4], OLED_DotOut3[5], OLED_DotOut3[6], OLED_DotOut3[7]);
+      adaLED.Scroller_Dot_Replace( Direction, Next_buf2[0], LedDotOut2[0], tmp_buf_cnv2);
+      for (i = 0; i < 7; i++) adaLED.Scroller_Dot_Replace( Direction, Next_buf2[i + 1], LedDotOut2[i + 1], Next_buf2[i]);
+      scl_cnt2++;
+    }
+
+    if (scl_cnt2 == 8) {
+      scl_cnt2 = 0;
+      FntReadOK2 = true;
+    }
+    SclTime2 = millis();
+  }
+
 }
 
 //**************メインループ*************************************************
@@ -233,7 +259,6 @@ void loop() {
 
   ret_str = ews.EWS_ESP8266CharReceive(PingSendTime); //ブラウザからのWebSocketデータ受信
 
-  ret_str[0] = 't';
   if (ret_str != "_close") {
     if (ret_str != "\0") {
       if (ret_str != "Ping") {
@@ -292,13 +317,11 @@ void loop() {
               u8ts.UTF8_to_SJIS_str_cnv(UTF8SJIS_file, scl_txt, sj_txt, &sj_length);
               fnt_cnt = 0; scl_cnt = 0; sj_cnt = 0; web_get = 0;
               FntReadOK = true; sjis_txt_in = true; Scl_Stop == false;
-              FntReadOK2 = false; sjis_txt_in2 = false;
               break;
             case 'T':
               u8ts.UTF8_to_SJIS_str_cnv(UTF8SJIS_file, scl_txt, sj_txt2, &sj_length2);
               fnt_cnt2 = 0; scl_cnt2 = 0; sj_cnt2 = 0; web_get = 0;
               FntReadOK2 = true; sjis_txt_in2 = true; Scl_Stop == false;
-              FntReadOK = false; sjis_txt_in = false;
               break;
           }
           Serial.println();
@@ -311,60 +334,14 @@ void loop() {
       }
     }
 
-    if (sjis_txt_in == true || sjis_txt_in2 == true) { //OLED１行目電光掲示板スクロール
-      if (millis() - SclTime > SclSpeed) {
-        if (sj_cnt >= sj_length) {
-          sj_cnt = 0;
-        }
-        if (FntReadOK == true) {
-          uint8_t cp = MFR.Sjis_To_MisakiFNT_DotRead(Zen_Font_file, Half_Font_file, Direction, Angle, sj_txt[sj_cnt], sj_txt[sj_cnt + 1], tmp_buf_cnv);
-          FntReadOK = false;
-          sj_cnt = sj_cnt + cp;
-          adaLED.LED_Black_White_Reversal(BW_reverse, tmp_buf_cnv, tmp_buf_cnv);
-          adaLED.LED_Dot_Rotation(Angle, tmp_buf_cnv, tmp_buf_cnv_2);
-        }
-
-        if (Scl_Stop == false) {
-          for (i = 0; i < 8; i++) adaLED.LED_Dot_Rotation(90, LedDotOut[i], OLED_DotOut2[i]);
-          oled.OLED_2X2_Display_Out_16x127(OLED_Adress, 0, 6, OLED_DotOut2[0], OLED_DotOut2[1], OLED_DotOut2[2], OLED_DotOut2[3], OLED_DotOut2[4], OLED_DotOut2[5], OLED_DotOut2[6], OLED_DotOut2[7]);
-          adaLED.Scroller_Dot_Replace( Direction, Next_buf[0], LedDotOut[0], tmp_buf_cnv_2);
-          for (i = 0; i < 7; i++) adaLED.Scroller_Dot_Replace( Direction, Next_buf[i + 1], LedDotOut[i + 1], Next_buf[i]);
-          scl_cnt++;
-        }
-
-        if (scl_cnt == 8) {
-          scl_cnt = 0;
-          FntReadOK = true;
-        }
-        SclTime = millis();
-      }
-
-      if (millis() - SclTime2 > SclSpeed2) { //OLED２行目電光掲示板スクロール
-        if (sj_cnt2 >= sj_length2) {
-          sj_cnt2 = 0;
-        }
-        if (FntReadOK2 == true) {
-          uint8_t cp2 = MFR.Sjis_To_MisakiFNT_DotRead(Zen_Font_file, Half_Font_file, Direction, Angle, sj_txt2[sj_cnt2], sj_txt2[sj_cnt2 + 1], tmp_buf_cnv2);
-          FntReadOK2 = false;
-          sj_cnt2 = sj_cnt2 + cp2;
-          adaLED.LED_Black_White_Reversal(BW_reverse2, tmp_buf_cnv2, tmp_buf_cnv2);
-        }
-
-        if (Scl_Stop == false) {
-          for (i = 0; i < 8; i++) adaLED.LED_Dot_Rotation(90, LedDotOut2[i], OLED_DotOut3[i]);
-          oled.OLED_2X2_Display_Out_16x127(OLED_Adress, 0, 4, OLED_DotOut3[0], OLED_DotOut3[1], OLED_DotOut3[2], OLED_DotOut3[3], OLED_DotOut3[4], OLED_DotOut3[5], OLED_DotOut3[6], OLED_DotOut3[7]);
-          adaLED.Scroller_Dot_Replace( Direction, Next_buf2[0], LedDotOut2[0], tmp_buf_cnv2);
-          for (i = 0; i < 7; i++) adaLED.Scroller_Dot_Replace( Direction, Next_buf2[i + 1], LedDotOut2[i + 1], Next_buf2[i]);
-          scl_cnt2++;
-        }
-
-        if (scl_cnt2 == 8) {
-          scl_cnt2 = 0;
-          FntReadOK2 = true;
-        }
-        SclTime2 = millis();
-      }
+    if (sjis_txt_in == true) { //OLED1行目電光掲示板スクロール
+      LCDDisplayLineOne(sj_txt);
     }
+
+    if (sjis_txt_in2 == true) {  //OLED2行目電光掲示板スクロール
+      LCDDisplayLineTwo(sj_txt2);
+    }
+
   } else if (ret_str == "_close") {
     ret_str = "";
     scl_txt = "";
@@ -380,8 +357,6 @@ void loop() {
 
     time_str = String(h_chr) + ':' + String(m_chr) + ':' + String(s_chr);
     ymd_str = String(year()) + '/' + String(month_chr) + '/' + String(day_chr) + "（" + String(TSD[weekday() - 1].week_jp) + "）";
-
-    // Serial.println("("+ WiFi.localIP().toString() + ")");
 
     uint8_t time_dot[4][8];
     u8ts.UTF8_to_SJIS_str_cnv(UTF8SJIS_file, time_str, time_sj_txt, &time_sj_length);
@@ -415,36 +390,6 @@ void loop() {
     prevDisplay = now();
   }
 
-  if (sjis_txt_in == false && sjis_txt_in2 == false) {
-    if (millis() - SclTime > SclSpeed) {
-      if (sj_cnt >= sj_length) {
-        sj_cnt = 0;
-      }
-      u8ts.UTF8_to_SJIS_str_cnv(UTF8SJIS_file, "     [" + WiFi.localIP().toString() + "]     ", sj_txt, &sj_length);
-      if (FntReadOK == true) {
-        uint8_t cp = MFR.Sjis_To_MisakiFNT_DotRead(Zen_Font_file, Half_Font_file, Direction, Angle, sj_txt[sj_cnt], sj_txt[sj_cnt + 1], tmp_buf_cnv);
-        FntReadOK = false;
-        sj_cnt = sj_cnt + cp;
-        adaLED.LED_Black_White_Reversal(BW_reverse, tmp_buf_cnv, tmp_buf_cnv);
-        adaLED.LED_Dot_Rotation(Angle, tmp_buf_cnv, tmp_buf_cnv_2);
-      }
-
-      if (Scl_Stop == false) {
-        for (i = 0; i < 8; i++) adaLED.LED_Dot_Rotation(90, LedDotOut[i], OLED_DotOut2[i]);
-        oled.OLED_2X2_Display_Out_16x127(OLED_Adress, 0, 6, OLED_DotOut2[0], OLED_DotOut2[1], OLED_DotOut2[2], OLED_DotOut2[3], OLED_DotOut2[4], OLED_DotOut2[5], OLED_DotOut2[6], OLED_DotOut2[7]);
-        adaLED.Scroller_Dot_Replace( Direction, Next_buf[0], LedDotOut[0], tmp_buf_cnv_2);
-        for (i = 0; i < 7; i++) adaLED.Scroller_Dot_Replace( Direction, Next_buf[i + 1], LedDotOut[i + 1], Next_buf[i]);
-        scl_cnt++;
-      }
-
-      if (scl_cnt == 8) {
-        scl_cnt = 0;
-        FntReadOK = true;
-      }
-      SclTime = millis();
-    }
-  }
-
   if (web_get == 0) {
     if (millis() - LastTime >= 300000L) { //5分毎にNTPサーバーからタイム取得
       setSyncProvider(getNtpTime);
@@ -469,7 +414,6 @@ void loop() {
       sprintf(Web_h, "%02d", hour());//ゼロを空白で埋める場合は%2dとする
       sprintf(Web_m, "%02d", minute());
       news_str = String("◆") + String(Web_h) + ":" + String(Web_m) + " ";
-      web_get = 1;
       switch (web_get) {
         case 1:
           news_str += ews.EWS_Web_Get(news1_1_host, news1_1_target_ip, '\n', "</rss>", "<title>", "</title>", "◆");
@@ -496,9 +440,6 @@ void loop() {
       String news2_str = "";
 
       news2_str = String("◆") + String(Web_h) + ":" + String(Web_m) + " ";
-
-      web_get = 2;
-
       switch (web_get2) {
         case 1:
           news2_str += ews.EWS_Web_Get(news2_1_host, news2_1_target_ip, '\n', "</rss>", "<title>", "</title>", "◆");
@@ -522,3 +463,52 @@ void loop() {
     }
   }
 }
+
+//*************************NTP Time**************************************
+time_t getNtpTime()
+{
+  while (Udp.parsePacket() > 0) ; // discard any previously received packets
+  Serial.println("Transmit NTP Request");
+  sendNTPpacket(timeServer);
+  uint32_t beginWait = millis();
+  while (millis() - beginWait < 1500) {
+    int size = Udp.parsePacket();
+    if (size >= NTP_PACKET_SIZE) {
+      Serial.println("Receive NTP Response");
+      Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
+      unsigned long secsSince1900;
+      // convert four bytes starting at location 40 to a long integer
+      secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
+      secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
+      secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
+      secsSince1900 |= (unsigned long)packetBuffer[43];
+      return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
+    }
+  }
+  Serial.println("No NTP Response :-(");
+  return 0; // return 0 if unable to get the time
+}
+
+//*************************NTP Time**************************************
+void sendNTPpacket(IPAddress &address)
+{ // send an NTP request to the time server at the given address
+  // set all bytes in the buffer to 0
+  memset(packetBuffer, 0, NTP_PACKET_SIZE);
+  // Initialize values needed to form NTP request
+  // (see URL above for details on the packets)
+  packetBuffer[0] = 0b11100011;   // LI, Version, Mode
+  packetBuffer[1] = 0;     // Stratum, or type of clock
+  packetBuffer[2] = 6;     // Polling Interval
+  packetBuffer[3] = 0xEC;  // Peer Clock Precision
+  // 8 bytes of zero for Root Delay & Root Dispersion
+  packetBuffer[12]  = 49;
+  packetBuffer[13]  = 0x4E;
+  packetBuffer[14]  = 49;
+  packetBuffer[15]  = 52;
+  // all NTP fields have been given values, now
+  // you can send a packet requesting a timestamp:
+  Udp.beginPacket(address, 123); //NTP requests are to port 123
+  Udp.write(packetBuffer, NTP_PACKET_SIZE);
+  Udp.endPacket();
+}
+
