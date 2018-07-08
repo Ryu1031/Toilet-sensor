@@ -40,13 +40,12 @@ Copyright (c) 2015 Ivan Grokhotkov. All rights reserved.
 Released under the GNU LESSER GENERAL PUBLIC LICENSE Version 2.1
 */
 
-#include "Arduino.h"
 #include "EasyWebSocket.h"
 
 const char* _GUID_str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 WiFiClient __client;
-WiFiServer server(80);
+WiFiServer server(8080);
 
 HTTPClientStatus1 _currentStatus;
 uint32_t _statusChange;
@@ -66,7 +65,6 @@ void EasyWebSocket::AP_Connect(const char* ssid, const char* password){
   
   WiFi.begin(ssid, password);
 
-
   pinMode(b_pin, INPUT);
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -80,6 +78,8 @@ void EasyWebSocket::AP_Connect(const char* ssid, const char* password){
       }
       if (initilize == 0) {
         Serial.print(".");
+      } else {
+        Serial.print("*");
       }
       delay(500);
   }
@@ -104,7 +104,7 @@ void EasyWebSocket::SoftAP_setup(const char* ssid, const char* password){
   Serial.println(ssid);
   
   WiFi.mode(WIFI_AP);
-   
+  
   WiFi.softAP(ssid, password);
   
   delay(1000);
@@ -127,6 +127,7 @@ void EasyWebSocket::handleClient(){
   if (_currentStatus == HC_NONE1) {
     WiFiClient _local_client = server.available();
     if (!_local_client) {
+      Serial.println(_local_client);
       return;
     }
 
@@ -142,6 +143,7 @@ void EasyWebSocket::handleClient(){
   if (!__client.connected()) {
     __client = WiFiClient();
     _currentStatus = HC_NONE1;
+    Serial.println("handleClient()-1");
     return;
   }
 
@@ -153,16 +155,19 @@ void EasyWebSocket::handleClient(){
         _currentStatus = HC_NONE1;
       }
       yield();
+      Serial.println("handleClient()-2");
       return;
     }
 
     if (!__client.connected()) {
       __client = WiFiClient();
       _currentStatus = HC_NONE1;
+      Serial.println("handleClient()-3");
       return;
     } else {
       _currentStatus = HC_WAIT_CLOSE1;
       _statusChange = millis();
+      Serial.println("handleClient()-4");
       return;
     }
   }
@@ -171,8 +176,10 @@ void EasyWebSocket::handleClient(){
     if (millis() - _statusChange > HTTP_MAX_CLOSE_WAIT) {
       __client = WiFiClient();
       _currentStatus = HC_NONE1;
+      Serial.println("handleClient()-5");
     } else {
       yield();
+      Serial.println("handleClient()-6");
       return;
     }
   }
@@ -182,14 +189,17 @@ bool EasyWebSocket::Get_Http_Req_Status(){
   String req;
   String hash_req_key;
   _GetLoopTime = millis();
+
   
   if(!_WS_on){
+  //Serial.println("Get_Http_Req_Status()-1");
     handleClient();
   }else{
     return false;
   }
-
+  //Serial.println("Get_Http_Req_Status()-2");
   if(__client){
+    Serial.println("Get_Http_Req_Status()-3");
     _GetLoopTime = millis();
     while(!_WS_on){
       if(millis()-_GetLoopTime > 5000L){
@@ -204,6 +214,7 @@ bool EasyWebSocket::Get_Http_Req_Status(){
           while(__client){
             if(millis()-_GetLoopTime > 5000L){
               EasyWebSocket::HandShake_timeout(2);
+              Serial.println("HandShake_timeout()");
               break;
             }
             if(__client.available()){
@@ -217,7 +228,7 @@ bool EasyWebSocket::Get_Http_Req_Status(){
                 break;
               }
             }
-						yield();
+            yield();
           }
           break;
         case true:
@@ -234,9 +245,11 @@ bool EasyWebSocket::Get_Http_Req_Status(){
           }
           break;
       }
-	  	yield();
+      yield();
     }
   }
+  //Serial.print("Get_Http_Req_Status()-false2:");
+  //Serial.println(__client);
   return false;
 }
 
@@ -276,7 +289,7 @@ bool EasyWebSocket::http_resp(){
   __client.print(F("HTTP/1.1 200 OK\r\n"));
   __client.print(F("Content-Type:text/html\r\n"));
   __client.print(F("Connection:close\r\n\r\n"));
-  
+
   return false;
 }
 //********hand shake time out *****************
@@ -406,7 +419,11 @@ void EasyWebSocket::EWS_HandShake(String res_html1, String res_html2, String res
   bool req_status = EasyWebSocket::Get_Http_Req_Status();
   
   if(req_status == true){
+    Serial.println("EWS_HandShake()");
     EasyWebSocket::EWS_HandShake_main(0, "/spiffs_01.txt", "", "", "", IPAddress(0,0,0,0), res_html1, res_html2, res_html3, res_html4, res_html5, res_html6, res_html7);
+    __client.write("var wsUri =\'");
+    __client.write(WiFi.localIP());
+    __client.write("'");
   }
 }
 
@@ -452,7 +469,7 @@ bool EasyWebSocket::EWS_HTTP_Responce(){
             Serial.print(F("hash_req_key ="));
             Serial.println(hash_req_key);
           }
-		  		yield();
+          yield();
         }
   
         delay(10);
@@ -495,7 +512,7 @@ bool EasyWebSocket::EWS_HTTP_Responce(){
         Serial.print(req);
         while(__client.available()){
           Serial.write(__client.read());
-		  		yield();
+          yield();
         }
         delay(10);
         __client.stop();
@@ -506,7 +523,7 @@ bool EasyWebSocket::EWS_HTTP_Responce(){
         LoopTime = millis();
       }
     }
-		yield();
+    yield();
   }
   return _WS_on;
 }
@@ -688,7 +705,7 @@ String EasyWebSocket::EWS_ESP8266CharReceive(uint16_t pTime){
       if(data_len == 0){
         while(__client.available()){
           b = __client.read();
-		  		yield();
+          yield();
         }
         Serial.println("Closing HandShake OK!");
       }else{
@@ -884,7 +901,7 @@ String EasyWebSocket::EWS_ESP8266_Binary_Receive(){
       if(data_len == 0){
         while(__client.available()){
           b = __client.read();
-		  		yield();
+          yield();
         }
         Serial.println("Closing HandShake OK!");
       }else{
@@ -929,7 +946,7 @@ String EasyWebSocket::EWS_ESP8266_Binary_Receive(){
             break;
           }
         }
-		    yield();
+        yield();
       }
       
       return str_close;
@@ -1084,11 +1101,11 @@ String EasyWebSocket::EWS_BrowserReceiveTextTag(String id, uint8_t font_size, St
 String EasyWebSocket::EWS_BrowserReceiveTextTag2(String id, String name, String b_color, uint8_t font_size, String fnt_col){
   String str;
   str = "<fieldset style='border-style: solid; border-color:";
-	str += b_color;
-	str += ";'>\r\n";
+  str += b_color;
+  str += ";'>\r\n";
   str += "<legend style='font-style: italic; color:";
-	str += b_color;
-	str += ";'>\r\n";
+  str += b_color;
+  str += ";'>\r\n";
   str += name;
   str += "</legend><span id='";
   str += id;
@@ -1117,8 +1134,8 @@ String EasyWebSocket::EWS_Close_Button2(String name, String BG_col, uint16_t wid
   str = "<input type='button' value='";
   str += name;
   str += "' style='background-color:";
-	str += BG_col;
-	str += "; width:";
+  str += BG_col;
+  str += "; width:";
   str += String(width);
   str += "px; height:";
   str += String(height);
@@ -1149,8 +1166,8 @@ String EasyWebSocket::EWS_Window_ReLoad_Button2(String name, String BG_col, uint
   str = "<input type='button' value='";
   str += name;
   str += "' style='background-color:";
-	str += BG_col;
-	str += "; width:";
+  str += BG_col;
+  str += "; width:";
   str += String(width);
   str += "px; height:";
   str += String(height);
@@ -1254,11 +1271,11 @@ String EasyWebSocket::EWS_Status_Text(uint8_t font_size, String color){
 String EasyWebSocket::EWS_Status_Text2(String name, String b_color, uint8_t font_size, String f_color){
   String str;
   str = "<fieldset style='border-style: solid; border-color:";
-	str += b_color;
-	str += ";'>\r\n";
+  str += b_color;
+  str += ";'>\r\n";
   str += "<legend style='font-style: italic; color:";
-	str += b_color;
-	str += ";'>\r\n";
+  str += b_color;
+  str += ";'>\r\n";
   str += name;
   str += "</legend><span id='__wsStatus__' style='font-size:";
   str += String(font_size);
@@ -1378,9 +1395,9 @@ String EasyWebSocket::EWS_Web_Get(const char* host, String target_ip, char char_
           __client.stop();
           break;
         }
-				yield();
+        yield();
       }
-	  	yield();
+      yield();
     }
   }
   ret_str += "\0";
@@ -1453,9 +1470,9 @@ String EasyWebSocket::EWS_https_Web_Get(const char* host, String target_ip, char
           Sec_client.stop();
           break;
         }
-				yield();
+        yield();
       }
-	  	yield();
+      yield();
     }
   }
   ret_str += "\0";
@@ -1477,7 +1494,7 @@ void EasyWebSocket::Favicon_Response(String str, uint8_t ws, uint8_t ini_htm, ui
   Serial.println(str);
   while(__client.available()){
     Serial.write(__client.read());
-		yield();
+    yield();
   }
   delay(1);
   

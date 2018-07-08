@@ -11,6 +11,8 @@
 
 const char* ssid = "";
 const char* password = "";
+//const char* ssid = "";
+//const char* password = "";
 
 const char* UTF8SJIS_file = "/Utf8Sjis.tbl"; //UTF8 Shift_JIS 変換テーブルファイル名を記載しておく
 const char* Zen_Font_file = "/MSKG13KU.FNT"; //全角フォントファイル名を定義
