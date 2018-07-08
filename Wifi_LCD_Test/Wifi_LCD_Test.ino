@@ -9,7 +9,6 @@
 #include <I2C_Adafruit_8x8_LED_matrix.h>
 #include <OLED_SSD1306.h>
 
-
 const char* ssid = "";
 const char* password = "";
 
@@ -62,7 +61,7 @@ boolean sjis_txt_in = true, sjis_txt_in2 = false;
 boolean BW_reverse = false, BW_reverse2 = false;
 
 //-------NTPサーバー定義----------------
-IPAddress timeServer(132, 163, 4, 101); // time-a.timefreq.bldrdoc.gov; //(129, 6, 15, 28)time.nist.gov NTP server
+IPAddress timeServer(52, 168, 138, 145); // time.windows.com NTP server
 const int NTP_PACKET_SIZE = 48; // NTP time stamp is in the first 48 bytes of the message
 byte packetBuffer[ NTP_PACKET_SIZE]; //buffer to hold incoming and outgoing packets
 const int timeZone = 9;     // Tokyo
@@ -104,8 +103,6 @@ uint8_t OLED_Next_buf[8][8] = {{0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0
 uint8_t tmp_OLED_buf_cnv2[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t tmp_OLED_buf_cnv3[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
-
-
 void initialize() {
   //セットアップで全角を一旦表示させることが重要。半角だとなぜかSPIFFSファイル読み込みエラーになってしまうため。
   u8ts.UTF8_to_SJIS_str_cnv(UTF8SJIS_file, "ＷＡＩＴ・・・・", sj_txt, &sj_length);
@@ -123,11 +120,11 @@ void initialize() {
   html_str1 += "<br>\r\n";
   html_str1 += ews.EWS_TextBox_Send("Txt2", "２行目任意text送信、半角ｶﾀｶﾅもOK!", "送信");
   html_str1 += "<br><br>\r\n";
-  html_str2 = "Scrolle Speed 1\r\n";
-  html_str2 += ews.EWS_Canvas_Slider_T("Speed", 200, 40, "#777777", "#77aaff");
-  html_str2 += "<br><br>\r\n";
-  html_str2 += "Scrolle Speed 2\r\n";
-  html_str2 += ews.EWS_Canvas_Slider_T("speed2", 200, 40, "#777777", "#77aaff");
+  //html_str2 = "Scrolle Speed 1\r\n";
+  //html_str2 += ews.EWS_Canvas_Slider_T("Speed",200,40,"#777777","#77aaff");
+  //html_str2 += "<br><br>\r\n";
+  //html_str2 += "Scrolle Speed 2\r\n";
+  //html_str2 += ews.EWS_Canvas_Slider_T("speed2",200,40,"#777777","#77aaff");
   html_str3 = "<br><br>\r\n";
   html_str3 += ews.EWS_On_Momentary_Button("_SclStop", "Scrole Stop", 100, 25, 15, "#ffffff", "#777777");
   html_str3 += "<br><br>１行目白黒反転　\r\n";
@@ -170,7 +167,6 @@ void setup()
   oled.setup_OLED_SSD1306(OLED_Adress);
   delay(300);
   initialize();
-
   ews.AP_Connect(ssid, password);
 
   //NTPサーバーでタイムを取得
